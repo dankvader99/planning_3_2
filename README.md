@@ -5,7 +5,7 @@ In the following instructions, we assume your catkin workspace is named catkin_w
 
 TEAM MEMBERS - 
 RITVIK REDDY KARNATI - 118542805
-ZHAO ZIDONG - ******
+ZHAO ZIDONG - 117513646
 - `cd ~/catkin_ws`
 - `catkin build`
 - `source ~/catkin_ws/devel/setup.bash`
