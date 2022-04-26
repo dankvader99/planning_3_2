@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+
+
+import rospy
+import tf
+from astar_ddc import *
+from tf.transformations import euler_from_quaternion
+from geometry_msgs.msg import Twist
+
+
+rospy.init_node('velocity publisher')
+
+listener = tf.TransformListener()
+velocity_publisher = rospy.Publisher('cmd_vel', Twist, queue_size=10)
+
+
+def publish_vel(linear_vel, angular_vel):
+    vel = Twist()
+    vel.linear.x = linear_vel
+    vel.angular.z = angular_vel
+    velocity_publisher.publish(vel)
+    
+
+def main():
+    x_s, y_s, theta = 50, 50, 0
+    x_g, y_g = 450, 450
+
+    rpm1, rpm2 = 25, 50
+
+    start_node = Node((x_s, y_s), theta, None, None, 0)
+    goal_node = Node((x_g, y_g), 0, None, None, 0)
+
+    graph = Graph()
+
+    graph.actions = np.array([(0, rpm1), (rpm1, 0), (rpm1, rpm1), 
+                              (0, rpm2), (rpm2, 0), (rpm2, rpm2), 
+                              (rpm1, rpm2), (rpm2, rpm1)])*0.10472
+
+    path, explored = A_Star(graph, start_node, goal_node)
+
+
+    print('\n path found')
+    print('\n running')
+    
+    rospy.sleep(10)
+
+    listener.waitForTransform('/odom', '/base_footprint',
+                                            rospy.Time(), rospy.Duration(500))
+    rate = rospy.Rate(1)
+
+    r = 0.038 #in metres
+    L = 0.354 #in metres
+
+    for node in path[1:]:
+        UL, UR = node.action
+
+        theta = node.parent.theta
+
+        theta_dot = (r / L) * (UR - UL) 
+        velocity_value = (r / 2) * (UL + UR)
+
+        T, R = listener.lookupTransform(
+                         '/odom', '/base_footprint', rospy.Time(0))
+
+        roll, pitch, yaw = euler_from_quaternion(R)
+
+        yaw = (yaw)*180/np.pi
+        diff = ((theta - yaw) + 180) % 360 - 180
+        publish_vel(velocity_value*2, theta_dot  + 0.02*diff)
+        rate.sleep()
+
+    publish_vel(0, 0)
+
+if __name__ == '__main__':
+    try: main()
+    except rospy.ROSInterruptException:
+        rospy.loginfo("Task terminated.")
+    
